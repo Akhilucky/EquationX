@@ -103,12 +103,26 @@ equationx dashboard
 
 ## Docker
 
+### Quick Start
+
 ```bash
 docker-compose up --build
 ```
 
 - **API:** http://localhost:8000
 - **Dashboard:** http://localhost:3000
+
+### Pull from Docker Hub
+
+```bash
+# Pull images
+docker pull akhilucky/equationx-backend:latest
+docker pull akhilucky/equationx-frontend:latest
+
+# Run directly
+docker run -p 8000:8000 akhilucky/equationx-backend:latest
+docker run -p 3000:80 akhilucky/equationx-frontend:latest
+```
 
 ---
 
