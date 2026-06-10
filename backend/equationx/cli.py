@@ -95,29 +95,39 @@ def _cmd_discover(args):
     from .orchestrator import get_job_status
     while True:
         time.sleep(1)
-        status = get_job_status(result.job_id)
-        print(f"  Progress: {status.progress:.0%}")
-        if status.status == "completed":
+        raw = get_job_status(result.job_id)
+        if isinstance(raw, dict):
+            status_progress = raw.get("progress", 0)
+            status_status = raw.get("status", "unknown")
+            status_error = raw.get("error")
+            status_best = raw.get("best_equation")
+        else:
+            status_progress = raw.progress
+            status_status = raw.status
+            status_error = raw.error
+            status_best = raw.best_equation
+        print(f"  Progress: {status_progress:.0%}")
+        if status_status == "completed":
             break
-        elif status.status == "failed":
-            print(f"  Failed: {status.error}")
+        elif status_status == "failed":
+            print(f"  Failed: {status_error}")
             sys.exit(1)
 
-    if status.best_equation:
+    if status_best:
         print(f"\nBest equation:")
-        print(f"  LaTeX: {status.best_equation['latex']}")
-        print(f"  MSE: {status.best_equation['mse']:.6f}")
-        print(f"  Complexity: {status.best_equation['complexity']}")
+        print(f"  LaTeX: {status_best['latex']}")
+        print(f"  MSE: {status_best['mse']:.6f}")
+        print(f"  Complexity: {status_best['complexity']}")
 
-        # Save to file
         out_file = "equation_result.json"
         with open(out_file, "w") as f:
-            json.dump(status.best_equation, f, indent=2)
+            json.dump(status_best, f, indent=2)
         print(f"\nSaved to {out_file}")
 
-    if status.pareto_front:
-        print(f"\nPareto frontier ({len(status.pareto_front)} points):")
-        for p in status.pareto_front[:5]:
+    pareto = raw.get("pareto_front") if isinstance(raw, dict) else getattr(raw, "pareto_front", None) if hasattr(raw, "__dict__") else None
+    if pareto:
+        print(f"\nPareto frontier ({len(pareto)} points):")
+        for p in pareto[:5]:
             print(f"  {p['latex']}  (MSE={p['mse']:.6f}, C={p['complexity']})")
 
 

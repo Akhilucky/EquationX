@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -9,11 +7,18 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - EQUATIONX_LOG_LEVEL=INFO
+      - EQUATIONX_CORS_ORIGINS=http://localhost:3000,http://frontend:80
+      - EQUATIONX_RATE_LIMIT=60
+      - EQUATIONX_RATE_WINDOW=60
+    volumes:
+      - equationx_data:/root/.equationx
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   frontend:
     build:
@@ -23,3 +28,7 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    restart: unless-stopped
+
+volumes:
+  equationx_data:

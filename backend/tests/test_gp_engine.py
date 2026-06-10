@@ -13,12 +13,12 @@ class TestGPEngine:
         assert engine.pop_size == 10
         assert engine.max_gen == 2
 
-    def test_random_individual(self):
+    def test_random_expression(self):
+        from equationx.gp_engine import _random_expression
         grammar = Grammar(variables=["x"], target="x")
-        engine = GPEngine(grammar)
-        ind = engine._random_individual()
-        assert isinstance(ind, list)
-        assert len(ind) > 0
+        tree = _random_expression(grammar)
+        assert tree is not None
+        assert hasattr(tree, 'to_sympy')
 
     def test_run_simple(self):
         grammar = Grammar(variables=["x"], target="x", max_depth=3)

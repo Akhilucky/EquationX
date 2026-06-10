@@ -240,9 +240,12 @@ df = generate_data("queue", n_points=500, noise_pct=0.05)
 
 | Layer | Technologies |
 |-------|-------------|
-| **Backend** | Python 3.10+, FastAPI, SymPy, DEAP, SciPy, NumPy, Pandas |
-| **Frontend** | React 18, TypeScript, Tailwind CSS, Recharts |
+| **Backend** | Python 3.10+, FastAPI, SymPy, DEAP, SciPy, NumPy, Pandas, Prometheus |
+| **Frontend** | React 18, TypeScript, Tailwind CSS, Recharts, Vitest |
+| **AI Agent** | LLM agent (OpenRouter/OpenAI) for guided discovery + explanation |
+| **Storage** | SQLite (persistent equation store) |
 | **MCP** | MCP SDK (stdio + SSE transport) |
+| **Observability** | Prometheus metrics, structured logging, rate limiting, API key auth |
 | **Deployment** | Docker, Docker Compose, GitHub Actions |
 
 ---
@@ -282,6 +285,20 @@ EquationX/
 ```
 
 ---
+
+## New in v0.2.0
+
+- **Rewritten GP Engine** — Proper subtree crossover/mutation, scipy constant optimization, configurable hall of fame
+- **LLM Agent** — AI-powered variable suggestions, equation explanations, and enriched anomaly reports (OpenRouter/OpenAI)
+- **Persistent SQLite Store** — Equations survive restarts; query, export, and compare across sessions
+- **Async Background Tasks** — CPU-intensive discovery runs in thread pool, doesn't block the API
+- **Prometheus Metrics** — Track discovery duration, forecast counts, active jobs (`GET /metrics`)
+- **Rate Limiting & API Key Auth** — Production-ready with configurable limits and optional Bearer auth
+- **Real-time Data Connectors** — Fetch data from Prometheus or Datadog APIs directly
+- **Confidence Interval Charts** — Forecase page now renders 90% CI bands using Recharts AreaChart
+- **CSV Upload in UI** — Drag-and-drop or select CSV files on the Discover page
+- **Frontend Testing** — Vitest + React Testing Library setup with navigation tests
+- **Structured Logging** — Timestamped, leveled logs throughout the backend
 
 ## Development
 

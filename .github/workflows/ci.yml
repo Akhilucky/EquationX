@@ -24,8 +24,13 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -e .
-          pip install pytest pytest-cov
+          pip install -e ".[dev,observability]"
+
+      - name: Lint
+        run: |
+          cd backend
+          pip install ruff
+          python -m ruff check equationx/
 
       - name: Run tests
         run: |
@@ -49,10 +54,24 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install and build
+      - name: Install dependencies
         run: |
           cd frontend
           npm install
+
+      - name: Lint
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd frontend
+          npm test
+
+      - name: Build
+        run: |
+          cd frontend
           npm run build
 
   docker:
@@ -61,8 +80,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build backend image
-        run: docker build -f Dockerfile.backend -t equationx-backend .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.backend
+          tags: equationx-backend:latest
+          load: true
 
       - name: Build frontend image
-        run: docker build -f Dockerfile.frontend -t equationx-frontend .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.frontend
+          tags: equationx-frontend:latest
+          load: true

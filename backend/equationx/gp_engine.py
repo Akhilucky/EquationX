@@ -1,7 +1,6 @@
-"""Genetic programming engine for equation discovery using DEAP."""
+"""High-performance genetic programming engine using DEAP + scipy optimization."""
 from __future__ import annotations
 
-import copy
 import math
 import random
 from typing import Callable, Dict, List, Optional, Tuple
@@ -11,10 +10,12 @@ from deap import base, creator, tools, algorithms
 
 from .grammar import ASTNode, BINARY_OPS, UNARY_OPS, Grammar, complexity
 
+try:
+    from scipy.optimize import minimize
+    _HAS_SCIPY_OPT = True
+except ImportError:
+    _HAS_SCIPY_OPT = False
 
-# ---------------------------------------------------------------------------
-# Creator (DEAP)
-# ---------------------------------------------------------------------------
 
 if not hasattr(creator, "FitnessMin"):
     creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
@@ -22,30 +23,178 @@ if not hasattr(creator, "Individual"):
     creator.create("Individual", list, fitness=creator.FitnessMin)
 
 
-# ---------------------------------------------------------------------------
-# Evaluation
-# ---------------------------------------------------------------------------
+def _find_constants(tree: ASTNode) -> List[int]:
+    """Return paths to all constant nodes in the tree."""
+    paths = []
 
-def _eval_individual(
-    individual: List[int],
+    def _walk(node: ASTNode, path: List[int]):
+        if node.op is None and isinstance(node.value, (int, float)):
+            paths.append(path[:])
+        for i, child in enumerate(node.children):
+            _walk(child, path + [i])
+
+    _walk(tree, [])
+    return paths
+
+
+def _set_constant(tree: ASTNode, path: List[int], value: float):
+    """Set a constant at a given path in the tree."""
+    node = tree
+    for idx in path:
+        node = node.children[idx]
+    node.value = round(value, 6)
+
+
+def _get_constants_vec(tree: ASTNode) -> List[float]:
+    """Extract all constants as a flat vector."""
+    vals = []
+
+    def _walk(node: ASTNode):
+        if node.op is None and isinstance(node.value, (int, float)):
+            vals.append(float(node.value))
+        for child in node.children:
+            _walk(child)
+
+    _walk(tree)
+    return vals
+
+
+def _optimize_constants(
+    tree: ASTNode,
+    grammar: Grammar,
+    X: np.ndarray,
+    y: np.ndarray,
+    variable_names: List[str],
+) -> ASTNode:
+    """Optimize numeric constants in the tree using scipy BFGS."""
+    if not _HAS_SCIPY_OPT:
+        return tree
+
+    const_paths = _find_constants(tree)
+    if not const_paths:
+        return tree
+
+    opt_tree = _deep_copy_tree(tree)
+    import sympy
+
+    def _make_func(params):
+        t = _deep_copy_tree(opt_tree)
+        for path, val in zip(const_paths, params):
+            _set_constant(t, path, val)
+        var_dict = {v: sympy.Symbol(v) for v in variable_names}
+        var_dict["t"] = sympy.Symbol("t")
+        try:
+            expr = t.to_sympy(var_dict)
+            sympy_vars = [var_dict[v] for v in variable_names]
+            f = sympy.lambdify(sympy_vars, expr, modules=["numpy", "math"])
+            preds = np.array([float(f(*row)) for row in X])
+            preds = np.nan_to_num(preds, nan=0.0, posinf=1e10, neginf=-1e10)
+            return float(np.mean((preds - y) ** 2))
+        except Exception:
+            return 1e10
+
+    init = _get_constants_vec(opt_tree)
+    if not init:
+        return tree
+
+    try:
+        res = minimize(_make_func, init, method="BFGS", options={"maxiter": 50, "disp": False})
+        if res.fun < _make_func(init):
+            for path, val in zip(const_paths, res.x):
+                _set_constant(opt_tree, path, val)
+    except Exception:
+        pass
+
+    return opt_tree
+
+
+def _deep_copy_tree(node: ASTNode) -> ASTNode:
+    """Deep copy an ASTNode tree."""
+    if node.op is None:
+        return ASTNode(value=node.value)
+    new = ASTNode(op=node.op, children=[_deep_copy_tree(c) for c in node.children],
+                  is_derivative=node.is_derivative, deriv_var=node.deriv_var,
+                  deriv_order=node.deriv_order)
+    return new
+
+
+def _random_expression(grammar: Grammar, max_depth: int = None) -> ASTNode:
+    """Generate a random expression tree."""
+    if max_depth is None:
+        max_depth = grammar.max_depth
+    return grammar.random_tree(max_depth=max_depth)
+
+
+def _crossover_trees(parent1: ASTNode, parent2: ASTNode) -> Tuple[ASTNode, ASTNode]:
+    """Subtree crossover: swap a random subtree between two parents."""
+    p1 = _deep_copy_tree(parent1)
+    p2 = _deep_copy_tree(parent2)
+
+    def _random_subtree(node: ASTNode) -> Optional[ASTNode]:
+        if node.op is None:
+            return node
+        if random.random() < 0.3:
+            return node
+        if node.children:
+            return _random_subtree(random.choice(node.children))
+        return node
+
+    def _replace_subtree(root: ASTNode, target: ASTNode, replacement: ASTNode) -> ASTNode:
+        if root is target:
+            return _deep_copy_tree(replacement)
+        new = _deep_copy_tree(root)
+        for i, child in enumerate(new.children):
+            new.children[i] = _replace_subtree(child, target, replacement)
+        return new
+
+    s1 = _random_subtree(p1)
+    s2 = _random_subtree(p2)
+
+    try:
+        child1 = _replace_subtree(p1, s1, s2)
+        child2 = _replace_subtree(p2, s2, s1)
+        return child1, child2
+    except RecursionError:
+        return p1, p2
+
+
+def _mutate_tree(tree: ASTNode, grammar: Grammar) -> ASTNode:
+    """Subtree mutation: replace a random subtree with a new random one."""
+    t = _deep_copy_tree(tree)
+
+    def _mutate_node(node: ASTNode, depth: int = 0) -> ASTNode:
+        if node.op is None:
+            if random.random() < 0.3:
+                return grammar.random_tree(max_depth=min(3, grammar.max_depth))
+            return node
+        if random.random() < 0.2:
+            return grammar.random_tree(max_depth=min(3, grammar.max_depth))
+        new = _deep_copy_tree(node)
+        for i, child in enumerate(new.children):
+            new.children[i] = _mutate_node(child, depth + 1)
+        return new
+
+    return _mutate_node(t)
+
+
+def _eval_individual_ast(
+    tree: ASTNode,
     grammar: Grammar,
     X: np.ndarray,
     y: np.ndarray,
     variable_names: List[str],
     target_idx: int,
 ) -> Tuple[float]:
-    """Evaluate an individual (encoded as node list) against data."""
+    """Evaluate an AST tree against data and return (score,)."""
     try:
-        tree = _decode_individual(individual, grammar)
-        var_dict = {v: __import__("sympy").Symbol(v) for v in variable_names}
-        var_dict["t"] = __import__("sympy").Symbol("t")
+        import sympy
+        var_dict = {v: sympy.Symbol(v) for v in variable_names}
+        var_dict["t"] = sympy.Symbol("t")
         expr = tree.to_sympy(var_dict)
 
-        # Convert to numerical function
         sympy_vars = [var_dict[v] for v in variable_names]
-        func = __import__("sympy").lambdify(sympy_vars, expr, modules=["numpy", "math"])
+        func = sympy.lambdify(sympy_vars, expr, modules=["numpy", "math"])
 
-        # Evaluate on data
         predictions = []
         for row in X:
             try:
@@ -59,92 +208,25 @@ def _eval_individual(
         predictions = np.array(predictions)
         mse = float(np.mean((predictions - y) ** 2))
         comp = complexity(tree)
-        # Combine MSE with complexity penalty
         score = mse + 0.001 * comp
-        return (score,)
+        return (max(1e-12, score),)
     except Exception:
         return (1e10,)
 
 
-# ---------------------------------------------------------------------------
-# Individual encoding / decoding
-# ---------------------------------------------------------------------------
-
-def _encode_tree(tree: ASTNode) -> List[int]:
-    """Flatten AST into a list of integers for DEAP."""
-    nodes = []
-    _flatten(tree, nodes)
-    return nodes
-
-
-def _flatten(node: ASTNode, out: List[int]):
-    if node.op is None:
-        out.append(0)  # terminal marker
-        if isinstance(node.value, (int, float)):
-            out.append(1)  # constant
-            out.append(int(node.value * 1000))
-        else:
-            out.append(0)  # variable
-            out.append(hash(str(node.value)) % 100)
-    else:
-        op_list = list(BINARY_OPS.keys()) + list(UNARY_OPS.keys())
-        idx = op_list.index(node.op) + 2 if node.op in op_list else 1
-        out.append(idx)
-        out.append(len(node.children))
-        for c in node.children:
-            _flatten(c, out)
-
-
-def _decode_individual(individual: List[int], grammar: Grammar) -> ASTNode:
-    """Decode a flat integer list back into an ASTNode."""
-    pos = [0]
-
-    def _read() -> ASTNode:
-        if pos[0] >= len(individual):
-            return grammar.random_terminal()
-
-        marker = individual[pos[0]]
-        pos[0] += 1
-
-        if marker == 0:  # terminal
-            is_const = individual[pos[0]] if pos[0] < len(individual) else 0
-            pos[0] += 1
-            val = individual[pos[0]] if pos[0] < len(individual) else 0
-            pos[0] += 1
-            if is_const == 1:
-                return ASTNode(value=val / 1000.0)
-            else:
-                var_idx = val % len(grammar.all_vars)
-                return ASTNode(value=grammar.all_vars[var_idx])
-        else:
-            op_list = list(BINARY_OPS.keys()) + list(UNARY_OPS.keys())
-            if marker - 2 < len(op_list):
-                op_name = op_list[marker - 2]
-            else:
-                op_name = "+"
-            n_children = individual[pos[0]] if pos[0] < len(individual) else 2
-            pos[0] += 1
-            children = [_read() for _ in range(max(1, min(n_children, 3)))]
-            return ASTNode(op=op_name, children=children)
-
-    return _read()
-
-
-# ---------------------------------------------------------------------------
-# GP Engine
-# ---------------------------------------------------------------------------
-
 class GPEngine:
-    """Genetic programming engine for symbolic regression."""
+    """High-performance genetic programming engine for symbolic regression."""
 
     def __init__(
         self,
         grammar: Grammar,
         population_size: int = 200,
         max_generations: int = 100,
-        crossover_prob: float = 0.7,
-        mutation_prob: float = 0.2,
-        tournament_size: int = 5,
+        crossover_prob: float = 0.8,
+        mutation_prob: float = 0.3,
+        tournament_size: int = 7,
+        hall_of_fame_size: int = 50,
+        optimize_constants: bool = True,
     ):
         self.grammar = grammar
         self.pop_size = population_size
@@ -152,50 +234,8 @@ class GPEngine:
         self.cx_prob = crossover_prob
         self.mut_prob = mutation_prob
         self.tourn_size = tournament_size
-
-        self.toolbox = base.Toolbox()
-        self._setup_toolbox()
-
-    def _setup_toolbox(self):
-        self.toolbox.register("individual", self._random_individual)
-        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
-        self.toolbox.register("select", tools.selTournament, tournsize=self.tourn_size)
-        self.toolbox.register("mate", self._crossover)
-        self.toolbox.register("mutate", self._mutate)
-
-    def _random_individual(self):
-        tree = self.grammar.random_tree()
-        return creator.Individual(_encode_tree(tree))
-
-    def _crossover(self, ind1, ind2):
-        """Subtree crossover."""
-        # Find a subtree in each and swap
-        try:
-            tree1 = _decode_individual(list(ind1), self.grammar)
-            tree2 = _decode_individual(list(ind2), self.grammar)
-            # Simple: swap random subtrees by re-encoding
-            cxpoint = random.randint(1, min(len(ind1), len(ind2)) - 1)
-            ind1[cxpoint:], ind2[cxpoint:] = ind2[cxpoint:], ind1[cxpoint:]
-        except Exception:
-            pass
-        return ind1, ind2
-
-    def _mutate(self, ind):
-        """Point mutation or subtree mutation."""
-        try:
-            if random.random() < 0.5:
-                # point mutation
-                idx = random.randint(0, len(ind) - 1)
-                ind[idx] = random.randint(0, max(ind) if ind else 10)
-            else:
-                # subtree mutation: replace part with new random tree
-                tree = self.grammar.random_tree(max_depth=3)
-                new_part = _encode_tree(tree)
-                point = random.randint(0, len(ind) - 1)
-                ind[point:point + 1] = new_part
-        except Exception:
-            pass
-        return (ind,)
+        self.hof_size = hall_of_fame_size
+        self.optimize_constants = optimize_constants
 
     def run(
         self,
@@ -206,56 +246,74 @@ class GPEngine:
         callback: Optional[Callable[[int, float, ASTNode], None]] = None,
     ) -> List[Tuple[ASTNode, float, int]]:
         """Run GP and return Pareto-optimal equations."""
-        self.toolbox.register(
-            "evaluate",
-            _eval_individual,
-            grammar=self.grammar,
-            X=X,
-            y=y,
-            variable_names=variable_names,
-            target_idx=target_idx,
-        )
 
-        pop = self.toolbox.population(n=self.pop_size)
-        hof = tools.ParetoFront()
+        # Create initial population
+        pop = []
+        for _ in range(self.pop_size):
+            tree = _random_expression(self.grammar)
+            pop.append(tree)
 
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean)
-        stats.register("min", np.min)
+        hof = []
+        best_mse = float("inf")
 
-        pop, logbook = algorithms.eaMuPlusLambda(
-            pop,
-            self.toolbox,
-            mu=self.pop_size,
-            lambda_=self.pop_size,
-            cxpb=self.cx_prob,
-            mutpb=self.mut_prob,
-            ngen=self.max_gen,
-            stats=stats,
-            halloffame=hof,
-            verbose=False,
-        )
+        for gen in range(self.max_gen):
+            # Evaluate
+            fitnesses = []
+            for tree in pop:
+                fit = _eval_individual_ast(
+                    tree, self.grammar, X, y, variable_names, target_idx
+                )
+                fitnesses.append(fit[0])
 
-        # Convert hall of fame to (ASTNode, mse, complexity)
-        results = []
-        seen = set()
-        for ind in hof:
-            try:
-                tree = _decode_individual(list(ind), self.grammar)
-                comp = complexity(tree)
-                mse = ind.fitness.values[0] if ind.fitness.valid else 1e10
-                key = str(tree)
-                if key not in seen and mse < 1e9:
-                    seen.add(key)
-                    results.append((tree, mse, comp))
-            except Exception:
-                continue
+            # Track best
+            gen_best = min(fitnesses)
+            if gen_best < best_mse:
+                best_mse = gen_best
+                best_tree = pop[fitnesses.index(gen_best)]
+                if self.optimize_constants:
+                    best_tree = _optimize_constants(
+                        best_tree, self.grammar, X, y, variable_names
+                    )
+                hof.append((_deep_copy_tree(best_tree), gen_best, complexity(best_tree)))
+                hof = sorted(hof, key=lambda x: x[1])[:self.hof_size]
 
-        # Sort by MSE for Pareto frontier
-        results.sort(key=lambda x: x[1])
+            if callback:
+                callback(gen, gen_best, pop[fitnesses.index(gen_best)])
 
-        if callback and results:
-            best = results[0]
-            callback(self.max_gen, best[1], best[0])
+            # Selection (tournament)
+            selected = []
+            for _ in range(self.pop_size):
+                tourn = random.sample(list(zip(pop, fitnesses)), min(self.tourn_size, len(pop)))
+                winner = min(tourn, key=lambda x: x[1])
+                selected.append(winner[0])
 
-        return results
+            # Crossover & mutation
+            offspring = []
+            for i in range(0, len(selected), 2):
+                p1 = selected[i]
+                p2 = selected[(i + 1) % len(selected)]
+                if random.random() < self.cx_prob:
+                    c1, c2 = _crossover_trees(p1, p2)
+                else:
+                    c1, c2 = _deep_copy_tree(p1), _deep_copy_tree(p2)
+                if random.random() < self.mut_prob:
+                    c1 = _mutate_tree(c1, self.grammar)
+                if random.random() < self.mut_prob:
+                    c2 = _mutate_tree(c2, self.grammar)
+                offspring.extend([c1, c2])
+
+            pop = offspring[:self.pop_size]
+
+        # Constant optimization on final hall of fame
+        if self.optimize_constants:
+            optimized_hof = []
+            for tree, mse_val, comp in hof:
+                opt_tree = _optimize_constants(tree, self.grammar, X, y, variable_names)
+                new_fit = _eval_individual_ast(
+                    opt_tree, self.grammar, X, y, variable_names, target_idx
+                )[0]
+                optimized_hof.append((opt_tree, new_fit, complexity(opt_tree)))
+            hof = optimized_hof
+
+        hof.sort(key=lambda x: x[1])
+        return hof
