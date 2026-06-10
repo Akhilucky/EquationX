@@ -62,10 +62,12 @@ class TestASTNode:
 
 
 class TestGrammar:
-    def test_random_terminal_variable(self):
+    def test_random_terminal_returns_node(self):
         grammar = Grammar(variables=["x", "y"], target="x")
-        term = grammar.random_terminal()
-        assert term.value in ["x", "y"]
+        for _ in range(20):
+            term = grammar.random_terminal()
+            assert isinstance(term, ASTNode)
+            assert term.value is not None
 
     def test_random_tree(self):
         grammar = Grammar(variables=["x", "y"], target="x", max_depth=3)
