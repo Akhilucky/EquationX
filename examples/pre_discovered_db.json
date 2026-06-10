@@ -1,0 +1,9 @@
+{
+  "id": "pre_discovered_db",
+  "latex": "\\frac{d(conn)}{dt} = 5.0 - 0.1 \\cdot conn",
+  "complexity": 4,
+  "mse": 0.0031,
+  "variables": ["connections"],
+  "target": "connections",
+  "description": "DB connection pool with exponential approach to equilibrium"
+}

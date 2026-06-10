@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "equationx": {
+      "url": "http://localhost:8001/sse",
+      "description": "EquationX MCP Server (SSE transport)"
+    }
+  }
+}

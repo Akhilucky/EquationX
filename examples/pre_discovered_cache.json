@@ -1,0 +1,9 @@
+{
+  "id": "pre_discovered_cache",
+  "latex": "\\frac{d(hit)}{dt} = 0.6 \\cdot (1 - hit) - 0.05 \\cdot hit",
+  "complexity": 4,
+  "mse": 0.0012,
+  "variables": ["hit_rate"],
+  "target": "hit_rate",
+  "description": "Cache utilization approaching steady-state hit rate"
+}

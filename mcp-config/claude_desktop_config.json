@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "equationx": {
+      "command": "python3",
+      "args": ["-m", "equationx", "serve", "--mode", "mcp"],
+      "env": {},
+      "description": "EquationX — AI Scientist for Infrastructure. Discovers mathematical laws from time-series data."
+    }
+  }
+}

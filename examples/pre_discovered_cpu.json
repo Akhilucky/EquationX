@@ -1,0 +1,9 @@
+{
+  "id": "pre_discovered_cpu",
+  "latex": "\\frac{d(c)}{dt} = 0.8 \\cdot (load - c) - 0.3 \\cdot c",
+  "complexity": 6,
+  "mse": 0.0018,
+  "variables": ["cpu_usage", "load"],
+  "target": "cpu_usage",
+  "description": "CPU autoscaling with exponential decay"
+}

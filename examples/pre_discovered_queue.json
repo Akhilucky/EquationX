@@ -1,0 +1,9 @@
+{
+  "id": "pre_discovered_queue",
+  "latex": "\\frac{d(queue)}{dt} = arrival\\_rate - service\\_rate \\cdot \\frac{queue}{100 + queue}",
+  "complexity": 8,
+  "mse": 0.0023,
+  "variables": ["queue_depth", "arrival_rate", "service_rate"],
+  "target": "queue_depth",
+  "description": "Queue system with Michaelis-Menten saturation"
+}
