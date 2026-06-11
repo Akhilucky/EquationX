@@ -1,14 +1,12 @@
 """Explanation engine: detect deviations and identify root causes."""
 from __future__ import annotations
 
-import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from .grammar import ASTNode
-from .ode_solver import solve_ode
-from .models import FactorContribution, ExplanationResult
+from .models import ExplanationResult, FactorContribution
 
 
 def explain_anomaly(
@@ -55,7 +53,10 @@ def explain_anomaly(
     factors = []
     if baseline_conditions is None:
         if predicted is not None:
-            baseline_conditions = {v: np.mean([actual.get(v, 0.0), predicted.get(v, actual.get(v, 0.0))]) for v in variable_names}
+            baseline_conditions = {
+                v: np.mean([actual.get(v, 0.0), predicted.get(v, actual.get(v, 0.0))])
+                for v in variable_names
+            }
         else:
             baseline_conditions = {v: actual.get(v, 0.0) for v in variable_names}
 
@@ -80,7 +81,11 @@ def explain_anomaly(
         impact = perturbed_val - predicted_value
         pct = (impact / (abs(predicted_value) + 1e-10)) * 100
 
-        direction = "above" if actual_v > expected_v else "below" if actual_v < expected_v else "neutral"
+        direction = (
+            "above" if actual_v > expected_v
+            else "below" if actual_v < expected_v
+            else "neutral"
+        )
 
         factors.append(
             FactorContribution(
@@ -98,14 +103,24 @@ def explain_anomaly(
     # Generate summary
     top_factor = factors[0] if factors else None
     if deviation > 0:
-        summary = f"{target} is at {actual_value:.1f} when expected {predicted_value:.1f} ({abs(deviation):.1f} above)."
+        summary = (
+            f"{target} is at {actual_value:.1f} when expected "
+            f"{predicted_value:.1f} ({abs(deviation):.1f} above)."
+        )
     elif deviation < 0:
-        summary = f"{target} is at {actual_value:.1f} when expected {predicted_value:.1f} ({abs(deviation):.1f} below)."
+        summary = (
+            f"{target} is at {actual_value:.1f} when expected "
+            f"{predicted_value:.1f} ({abs(deviation):.1f} below)."
+        )
     else:
         summary = f"{target} is at expected value {actual_value:.1f}."
 
     if top_factor:
-        summary += f" {top_factor.variable} ({top_factor.actual_value:.1f}) is {abs(top_factor.impact_pct):.0f}% {top_factor.direction} normal."
+        summary += (
+            f" {top_factor.variable} ({top_factor.actual_value:.1f}) "
+            f"is {abs(top_factor.impact_pct):.0f}% "
+            f"{top_factor.direction} normal."
+        )
 
     # Generate recommendation
     recommendation = _generate_recommendation(target, deviation, factors)
@@ -133,9 +148,15 @@ def _generate_recommendation(
     if "queue" in target.lower():
         if deviation > 0:
             if top and "arrival" in top.variable.lower():
-                return "Arrival rate is elevated. Consider rate-limiting or scaling up service capacity."
+                return (
+                    "Arrival rate is elevated. Consider "
+                    "rate-limiting or scaling up service capacity."
+                )
             elif top and "service" in top.variable.lower():
-                return "Service rate is below normal. Scale up service instances or reduce workload."
+                return (
+                    "Service rate is below normal. "
+                    "Scale up service instances or reduce workload."
+                )
             else:
                 return "Queue is higher than expected. Review workload and capacity."
         else:
@@ -147,12 +168,18 @@ def _generate_recommendation(
             return "CPU usage is lower than expected. Consider reducing allocated resources."
     elif "conn" in target.lower():
         if deviation > 0:
-            return "Database connections are higher than expected. Check for connection leaks or scale pool."
+            return (
+                "Database connections are higher than expected. "
+                "Check for connection leaks or scale pool."
+            )
         else:
             return "Database connections are lower than expected. Pool may be over-provisioned."
     elif "hit" in target.lower() or "cache" in target.lower():
         if deviation > 0:
-            return "Cache hit rate is lower than expected. Review cache eviction policy or increase cache size."
+            return (
+                "Cache hit rate is lower than expected. "
+                "Review cache eviction policy or increase cache size."
+            )
         else:
             return "Cache is performing better than expected."
 

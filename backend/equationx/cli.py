@@ -49,7 +49,10 @@ def main(argv=None):
 
     # serve
     p_serve = subparsers.add_parser("serve", help="Start API or MCP server")
-    p_serve.add_argument("--mode", choices=["api", "mcp", "mcp-sse"], default="api", help="Server mode (mcp=stdio, mcp-sse=HTTP)")
+    p_serve.add_argument(
+        "--mode", choices=["api", "mcp", "mcp-sse"], default="api",
+        help="Server mode (mcp=stdio, mcp-sse=HTTP)",
+    )
     p_serve.add_argument("--port", type=int, default=8000, help="Port number")
     p_serve.add_argument("--host", default="0.0.0.0", help="Host to bind to")
 
@@ -75,8 +78,8 @@ def main(argv=None):
 
 
 def _cmd_discover(args):
-    from .orchestrator import run_discovery
     from .models import DiscoverRequest
+    from .orchestrator import run_discovery
 
     request = DiscoverRequest(
         csv_path=args.csv,
@@ -87,7 +90,7 @@ def _cmd_discover(args):
         system_type=args.system,
     )
 
-    print(f"Starting equation discovery...")
+    print("Starting equation discovery...")
     result = run_discovery(request)
     print(f"Job {result.job_id}: {result.status}")
 
@@ -114,7 +117,7 @@ def _cmd_discover(args):
             sys.exit(1)
 
     if status_best:
-        print(f"\nBest equation:")
+        print("\nBest equation:")
         print(f"  LaTeX: {status_best['latex']}")
         print(f"  MSE: {status_best['mse']:.6f}")
         print(f"  Complexity: {status_best['complexity']}")
@@ -124,7 +127,11 @@ def _cmd_discover(args):
             json.dump(status_best, f, indent=2)
         print(f"\nSaved to {out_file}")
 
-    pareto = raw.get("pareto_front") if isinstance(raw, dict) else getattr(raw, "pareto_front", None) if hasattr(raw, "__dict__") else None
+    pareto = (
+        raw.get("pareto_front") if isinstance(raw, dict)
+        else getattr(raw, "pareto_front", None)
+        if hasattr(raw, "__dict__") else None
+    )
     if pareto:
         print(f"\nPareto frontier ({len(pareto)} points):")
         for p in pareto[:5]:
@@ -132,8 +139,8 @@ def _cmd_discover(args):
 
 
 def _cmd_forecast(args):
-    from .orchestrator import run_forecast
     from .models import ForecastRequest
+    from .orchestrator import run_forecast
 
     with open(args.equation_file) as f:
         eq_data = json.load(f)
@@ -154,15 +161,18 @@ def _cmd_forecast(args):
     if result.threshold_breach:
         print(f"  THRESHOLD BREACH at t={result.time_to_breach_minutes:.1f} min")
     else:
-        print(f"  No threshold breach")
-    print(f"\nTrajectory:")
+        print("  No threshold breach")
+    print("\nTrajectory:")
     for pt in result.trajectory[::5]:
-        print(f"  t={pt.time_minutes:6.1f}  val={pt.value:8.2f}  CI=[{pt.lower_ci:.2f}, {pt.upper_ci:.2f}]")
+        print(
+            f"  t={pt.time_minutes:6.1f}  val={pt.value:8.2f}  "
+            f"CI=[{pt.lower_ci:.2f}, {pt.upper_ci:.2f}]"
+        )
 
 
 def _cmd_explain(args):
-    from .orchestrator import run_explanation
     from .models import ExplanationRequest
+    from .orchestrator import run_explanation
 
     with open(args.equation_file) as f:
         eq_data = json.load(f)
@@ -175,18 +185,25 @@ def _cmd_explain(args):
     )
 
     result = run_explanation(request)
-    print(f"Explanation:")
+    print("Explanation:")
     print(f"  {result.summary}")
-    print(f"  Predicted: {result.predicted_value}, Actual: {result.actual_value}, Deviation: {result.deviation}")
-    print(f"  Contributing factors:")
+    print(
+        f"  Predicted: {result.predicted_value}, "
+        f"Actual: {result.actual_value}, "
+        f"Deviation: {result.deviation}"
+    )
+    print("  Contributing factors:")
     for f in result.contributing_factors:
-        print(f"    {f.variable}: {f.actual_value:.1f} vs {f.expected_value:.1f} ({f.impact_pct:+.1f}%)")
+        print(
+            f"    {f.variable}: {f.actual_value:.1f} vs "
+            f"{f.expected_value:.1f} ({f.impact_pct:+.1f}%)"
+        )
     print(f"  Recommendation: {result.recommendation}")
 
 
 def _cmd_simulate(args):
-    from .orchestrator import run_simulation
     from .models import SimulateRequest
+    from .orchestrator import run_simulation
 
     with open(args.equation_file) as f:
         eq_data = json.load(f)
@@ -202,25 +219,26 @@ def _cmd_simulate(args):
     )
 
     result = run_simulation(request)
-    print(f"Simulation:")
+    print("Simulation:")
     print(f"  Peak: {result.peak_value}")
     print(f"  Steady-state: {result.steady_state_value}")
     print(f"  Time to stabilize: {result.time_to_stabilize_minutes} min")
     if result.threshold_breach:
-        print(f"  THRESHOLD BREACH")
+        print("  THRESHOLD BREACH")
     print(f"  Recommendation: {result.recommendation}")
 
 
 def _cmd_serve(args):
     if args.mode == "api":
-        from .api import create_app
         import uvicorn
+
+        from .api import create_app
         app = create_app()
         print(f"Starting API server on {args.host}:{args.port}...")
         uvicorn.run(app, host=args.host, port=args.port)
     elif args.mode == "mcp":
         from .mcp_server import run_mcp_stdio
-        print(f"Starting MCP server (stdio)...")
+        print("Starting MCP server (stdio)...")
         run_mcp_stdio()
     elif args.mode == "mcp-sse":
         from .mcp_server import run_mcp_sse
@@ -229,8 +247,8 @@ def _cmd_serve(args):
 
 
 def _cmd_dashboard(args):
-    import subprocess
     import os
+    import subprocess
     frontend_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
     if os.path.exists(frontend_dir):
         subprocess.run(["npm", "run", "dev"], cwd=frontend_dir)

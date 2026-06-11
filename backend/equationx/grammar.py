@@ -1,38 +1,32 @@
 """Expression AST, grammar, and symbolic utilities for EquationX."""
 from __future__ import annotations
 
-import math
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-import numpy as np
 from sympy import (
-    Symbol,
-    symbols,
-    sympify,
-    Expr,
-    Function,
-    Derivative,
-    Integer,
-    Float,
     Add,
+    Derivative,
+    Expr,
+    Float,
+    Function,
     Mul,
     Pow,
-    exp,
-    log,
-    sin,
-    cos,
-    sqrt,
-    simplify,
-    latex,
-    Equality,
     S,
+    Symbol,
+    cos,
+    exp,
+    latex,
+    log,
+    simplify,
+    sin,
+    sqrt,
 )
 from sympy.parsing.sympy_parser import (
+    implicit_multiplication_application,
     parse_expr,
     standard_transformations,
-    implicit_multiplication_application,
 )
 
 # ---------------------------------------------------------------------------
@@ -203,7 +197,10 @@ def _sympy_to_ast(expr: Expr, variables: List[str]) -> ASTNode:
     if isinstance(expr, Derivative):
         inner = _sympy_to_ast(expr.args[0], variables)
         var = str(expr.variables[0])
-        return ASTNode(is_derivative=True, children=[inner], deriv_var=var, deriv_order=expr.derivative_count)
+        return ASTNode(
+            is_derivative=True, children=[inner],
+            deriv_var=var, deriv_order=expr.derivative_count,
+        )
     if isinstance(expr, Add):
         children = [_sympy_to_ast(a, variables) for a in expr.args]
         result = children[0]

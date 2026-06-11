@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import time
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Callable
 
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+    from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
     _prometheus_available = True
 except ImportError:
     _prometheus_available = False
@@ -87,7 +87,7 @@ def track_duration(metric: Histogram):
                 result = func(*args, **kwargs)
                 metric.observe(time.time() - start)
                 return result
-            except Exception as e:
+            except Exception:
                 metric.observe(time.time() - start)
                 raise
         return wrapper

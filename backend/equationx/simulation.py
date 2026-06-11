@@ -1,18 +1,17 @@
 """Simulation module: parameter modification and trajectory prediction."""
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from .grammar import ASTNode
+from .models import SimulateResult
 from .ode_solver import (
-    solve_ode,
-    forecast,
     detect_threshold_breach,
     estimate_steady_state,
+    solve_ode,
 )
-from .models import SimulateResult
 
 
 def simulate_scenario(

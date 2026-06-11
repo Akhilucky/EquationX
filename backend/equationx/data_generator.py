@@ -1,12 +1,10 @@
 """Synthetic data generator for 4 infrastructure system types."""
 from __future__ import annotations
 
-import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # System definitions (ground-truth ODEs)
@@ -16,7 +14,10 @@ SYSTEMS = {
     "queue": {
         "variables": ["queue_depth", "arrival_rate", "service_rate", "t"],
         "target": "queue_depth",
-        "equation_latex": r"\frac{d(queue)}{dt} = arrival\_rate - service\_rate \cdot \frac{queue}{K + queue}",
+        "equation_latex": (
+            r"\frac{d(queue)}{dt} = arrival\_rate - "
+            r"service\_rate \cdot \frac{queue}{K + queue}"
+        ),
         "description": "Queue system with saturation (Michaelis-Menten)",
     },
     "cpu": {
@@ -212,7 +213,10 @@ def generate_data(
 ) -> pd.DataFrame:
     """Generate data for a given system type."""
     if system_type not in GENERATORS:
-        raise ValueError(f"Unknown system type: {system_type}. Choose from: {list(GENERATORS.keys())}")
+        choices = list(GENERATORS.keys())
+        raise ValueError(
+            f"Unknown system type: {system_type}. Choose from: {choices}"
+        )
     return GENERATORS[system_type](n_points=n_points, dt=dt, noise_pct=noise_pct, seed=seed)
 
 

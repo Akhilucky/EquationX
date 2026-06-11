@@ -1,26 +1,26 @@
 """MCP Server for EquationX — 4 tools with SSE transport."""
 from __future__ import annotations
 
-import json
 import asyncio
+import json
 from typing import Any, Dict
 
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
-from .orchestrator import (
-    run_discovery,
-    run_forecast,
-    run_explanation,
-    run_simulation,
-    get_job_status,
-)
 from .models import (
     DiscoverRequest,
-    ForecastRequest,
     ExplanationRequest,
+    ForecastRequest,
     SimulateRequest,
+)
+from .orchestrator import (
+    get_job_status,
+    run_discovery,
+    run_explanation,
+    run_forecast,
+    run_simulation,
 )
 
 
@@ -33,21 +33,31 @@ def create_mcp_server() -> Server:
             Tool(
                 name="discover_equation",
                 description=(
-                    "Discover mathematical equations (ODEs) from CSV time-series data. "
-                    "Uses genetic programming + symbolic regression to find differential equations. "
-                    "Returns LaTeX equation, Pareto frontier (accuracy vs complexity), and metadata. "
-                    "Supports operators: +, -, *, /, exp, log, sin, cos, sqrt, d/dt."
+                    "Discover mathematical equations (ODEs) from "
+                    "CSV time-series data. "
+                    "Uses genetic programming + symbolic regression "
+                    "to find differential equations. "
+                    "Returns LaTeX equation, Pareto frontier "
+                    "(accuracy vs complexity), and metadata. "
+                    "Supports operators: "
+                    "+, -, *, /, exp, log, sin, cos, sqrt, d/dt."
                 ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "csv_data": {
                             "type": "string",
-                            "description": "CSV data as a string (with header row). Each column is a variable, 't' is time.",
+                            "description": (
+                                "CSV data as a string (with header row). "
+                                "Each column is a variable, 't' is time."
+                            ),
                         },
                         "target": {
                             "type": "string",
-                            "description": "Target variable to discover equation for (e.g. 'queue_depth', 'cpu_usage')",
+                            "description": (
+                                "Target variable to discover equation for "
+                                "(e.g. 'queue_depth', 'cpu_usage')"
+                            ),
                         },
                         "system_type": {
                             "type": "string",
@@ -63,7 +73,10 @@ def create_mcp_server() -> Server:
                         "max_generations": {
                             "type": "integer",
                             "default": 100,
-                            "description": "Number of GP generations (higher = better equations, slower)",
+                            "description": (
+                                "Number of GP generations "
+                                "(higher = better equations, slower)"
+                            ),
                         },
                         "population_size": {
                             "type": "integer",
@@ -86,11 +99,18 @@ def create_mcp_server() -> Server:
                     "properties": {
                         "equation": {
                             "type": "string",
-                            "description": "LaTeX or sympy-format equation string (e.g. '0.95 * arrival_rate - 1.21 * service_rate')",
+                            "description": (
+                                "LaTeX or sympy-format equation string "
+                                "(e.g. '0.95 * arrival_rate - "
+                                "1.21 * service_rate')"
+                            ),
                         },
                         "initial_conditions": {
                             "type": "object",
-                            "description": "Initial values for all variables (e.g. {'queue_depth': 10, 'arrival_rate': 8.0})",
+                            "description": (
+                                "Initial values for all variables "
+                                "(e.g. {'queue_depth': 10, 'arrival_rate': 8.0})"
+                            ),
                         },
                         "horizon_minutes": {
                             "type": "integer",
@@ -99,7 +119,11 @@ def create_mcp_server() -> Server:
                         },
                         "threshold": {
                             "type": "number",
-                            "description": "Optional threshold value. If the trajectory crosses this, a breach time is reported.",
+                            "description": (
+                                "Optional threshold value. "
+                                "If the trajectory crosses this, "
+                                "a breach time is reported."
+                            ),
                         },
                     },
                     "required": ["equation", "initial_conditions"],
@@ -108,9 +132,12 @@ def create_mcp_server() -> Server:
             Tool(
                 name="explain_anomaly",
                 description=(
-                    "Explain why actual observed values differ from equation predictions. "
-                    "Identifies contributing factors with impact percentages. "
-                    "Returns a natural language summary, root cause analysis, and actionable recommendations."
+                    "Explain why actual observed values differ "
+                    "from equation predictions. "
+                    "Identifies contributing factors "
+                    "with impact percentages. "
+                    "Returns a natural language summary, "
+                    "root cause analysis, and actionable recommendations."
                 ),
                 inputSchema={
                     "type": "object",
@@ -121,7 +148,11 @@ def create_mcp_server() -> Server:
                         },
                         "actual": {
                             "type": "object",
-                            "description": "Actual observed values for all variables (e.g. {'queue_depth': 95, 'arrival_rate': 12.4})",
+                            "description": (
+                                "Actual observed values for all variables "
+                                "(e.g. {'queue_depth': 95, "
+                                "'arrival_rate': 12.4})"
+                            ),
                         },
                     },
                     "required": ["equation", "actual"],
@@ -130,9 +161,12 @@ def create_mcp_server() -> Server:
             Tool(
                 name="simulate_scenario",
                 description=(
-                    "Run what-if simulations by modifying system parameters. "
-                    "Simulates the new trajectory using the modified equation and compares with baseline. "
-                    "Returns peak value, steady-state, time to stabilize, and recommendations."
+                    "Run what-if simulations by modifying "
+                    "system parameters. "
+                    "Simulates the new trajectory using "
+                    "the modified equation and compares with baseline. "
+                    "Returns peak value, steady-state, "
+                    "time to stabilize, and recommendations."
                 ),
                 inputSchema={
                     "type": "object",
@@ -283,12 +317,28 @@ def run_mcp_stdio():
 
 def run_mcp_sse(host: str = "0.0.0.0", port: int = 8001):
     """Run MCP server over SSE transport (HTTP)."""
-    from starlette.applications import Starlette
-    from starlette.routing import Route, Mount
+    import os
+
     import uvicorn
+    from starlette.applications import Starlette
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse
+    from starlette.routing import Mount, Route
 
     server = create_mcp_server()
     sse = SseServerTransport("/messages/")
+
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            api_key = os.environ.get("EQUATIONX_API_KEY", "")
+            if api_key:
+                auth = request.headers.get("Authorization", "")
+                key = auth.replace("Bearer ", "").strip()
+                if not key or key != api_key:
+                    return JSONResponse(
+                        {"error": "Unauthorized"}, status_code=401,
+                    )
+            return await call_next(request)
 
     async def handle_sse(request):
         async with sse.connect_sse(
@@ -303,8 +353,11 @@ def run_mcp_sse(host: str = "0.0.0.0", port: int = 8001):
             Mount("/messages/", app=sse.handle_post_message),
         ],
     )
+    app.add_middleware(AuthMiddleware)
 
     print(f"EquationX MCP server running on http://{host}:{port}")
     print(f"  SSE endpoint: http://{host}:{port}/sse")
     print(f"  Messages endpoint: http://{host}:{port}/messages/")
+    if os.environ.get("EQUATIONX_API_KEY"):
+        print("  Auth: API key required (EQUATIONX_API_KEY)")
     uvicorn.run(app, host=host, port=port)

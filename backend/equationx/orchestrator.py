@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -11,30 +10,44 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from .grammar import ASTNode, Grammar, complexity, simplify_ast
-from .gp_engine import GPEngine
-from .pareto import compute_pareto_frontier, select_best_equation
-from .ode_solver import solve_ode, forecast, detect_threshold_breach, estimate_steady_state
-from .explanation import explain_anomaly
-from .simulation import simulate_scenario
+from .agent import LLMAgent
 from .data_generator import generate_data
 from .database import (
-    init_db, save_equation, list_equations as db_list_equations,
-    get_equation as db_get_equation, save_job_status,
+    get_equation as db_get_equation,
+)
+from .database import (
     get_job_status_from_db,
+    init_db,
+    save_equation,
+    save_job_status,
 )
-from .agent import LLMAgent
-from .observability import (
-    track_duration, DISCOVERY_DURATION, DISCOVERIES_TOTAL,
-    EQUATIONS_DISCOVERED, ACTIVE_JOBS,
+from .database import (
+    list_equations as db_list_equations,
 )
+from .explanation import explain_anomaly
+from .gp_engine import GPEngine
+from .grammar import ASTNode, Grammar
 from .logging_config import get_logger
 from .models import (
-    DiscoverRequest, DiscoverResponse, DiscoverStatus,
-    ForecastRequest, ForecastResult, ForecastPoint,
-    ExplanationRequest, ExplanationResult,
-    SimulateRequest, SimulateResult, HealthResponse,
+    DiscoverRequest,
+    DiscoverResponse,
+    ExplanationRequest,
+    ExplanationResult,
+    ForecastRequest,
+    ForecastResult,
+    SimulateRequest,
+    SimulateResult,
 )
+from .observability import (
+    ACTIVE_JOBS,
+    DISCOVERIES_TOTAL,
+    DISCOVERY_DURATION,
+    EQUATIONS_DISCOVERED,
+    track_duration,
+)
+from .ode_solver import detect_threshold_breach, estimate_steady_state, forecast
+from .pareto import compute_pareto_frontier, select_best_equation
+from .simulation import simulate_scenario
 
 logger = get_logger(__name__)
 
@@ -222,7 +235,10 @@ def run_forecast(request: ForecastRequest) -> ForecastResult:
     """Run forecast on an equation."""
     _ensure_db()
     from sympy import Symbol, parse_expr
-    from sympy.parsing.sympy_parser import standard_transformations, implicit_multiplication_application
+    from sympy.parsing.sympy_parser import (
+        implicit_multiplication_application,
+        standard_transformations,
+    )
 
     var_names = list(request.initial_conditions.keys())
     if "t" not in var_names:
@@ -269,7 +285,10 @@ def run_explanation(request: ExplanationRequest) -> ExplanationResult:
     """Run explanation on an anomaly."""
     _ensure_db()
     from sympy import Symbol, parse_expr
-    from sympy.parsing.sympy_parser import standard_transformations, implicit_multiplication_application
+    from sympy.parsing.sympy_parser import (
+        implicit_multiplication_application,
+        standard_transformations,
+    )
 
     var_names = list(request.actual.keys())
     if "t" not in var_names:
@@ -313,7 +332,10 @@ def run_simulation(request: SimulateRequest) -> SimulateResult:
     """Run what-if simulation."""
     _ensure_db()
     from sympy import Symbol, parse_expr
-    from sympy.parsing.sympy_parser import standard_transformations, implicit_multiplication_application
+    from sympy.parsing.sympy_parser import (
+        implicit_multiplication_application,
+        standard_transformations,
+    )
 
     var_names = list(request.initial_conditions.keys())
     if "t" not in var_names:
@@ -324,7 +346,10 @@ def run_simulation(request: SimulateRequest) -> SimulateResult:
     expr = parse_expr(request.equation, local_dict=var_dict, transformations=transformations)
 
     from .grammar import _sympy_to_ast
-    target = [v for v in request.initial_conditions.keys() if v != "t"][0] if request.initial_conditions else "value"
+    target = (
+        [v for v in request.initial_conditions.keys() if v != "t"][0]
+        if request.initial_conditions else "value"
+    )
     ast = _sympy_to_ast(expr, var_names)
 
     return simulate_scenario(

@@ -5,7 +5,7 @@ import json
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 _db_path: Path = Path.home() / ".equationx" / "equations.db"
 _local = threading.local()

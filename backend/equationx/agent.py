@@ -73,7 +73,7 @@ Columns: {column_names}
 Sample data (first 3 rows): {json.dumps(sample_data, indent=2)}
 
 Identify:
-1. Which variable is most likely the target (dependent variable) to model? 
+1. Which variable is most likely the target (dependent variable) to model?
 2. Which variables are likely independent variables?
 3. What kind of system does this look like? (queue, CPU, DB, cache, network, memory, etc.)
 4. Suggest plausible functional forms for d(target)/dt
@@ -81,7 +81,9 @@ Identify:
 Return JSON: {{"target": "...", "features": [...], "system_type": "...", "suggested_forms": [...]}}
 """
         response = self._call_llm([
-            {"role": "system", "content": "You are an infrastructure monitoring AI that helps discover system dynamics."},
+            {"role": "system", "content": (
+                "You are an infrastructure monitoring AI that helps discover system dynamics."
+            )},
             {"role": "user", "content": prompt},
         ])
 
@@ -136,7 +138,9 @@ Describe what this equation reveals about the system's behavior:
 - Any insights about stability or capacity?
 Keep it concise."""
         response = self._call_llm([
-            {"role": "system", "content": "You explain mathematical models to infrastructure engineers."},
+            {"role": "system", "content": (
+                "You explain mathematical models to infrastructure engineers."
+            )},
             {"role": "user", "content": prompt},
         ])
         return response or "LLM explanation unavailable."
@@ -159,13 +163,18 @@ Include: root cause, impact, and recommended action (1-2 sentences each).
 Return JSON: {{"root_cause": "...", "impact": "...", "action": "..."}}
 """
         response = self._call_llm([
-            {"role": "system", "content": "You are an SRE on call. Write clear incident summaries."},
+            {"role": "system", "content": (
+                "You are an SRE on call. Write clear incident summaries."
+            )},
             {"role": "user", "content": prompt},
         ])
         if not response:
             return {
                 "root_cause": "See contributing factors above.",
-                "impact": f"Deviation of {predicted_value - actual.get(list(actual.keys())[0], 0):.1f}",
+                "impact": (
+                    f"Deviation of "
+                    f"{predicted_value - actual.get(list(actual.keys())[0], 0):.1f}"
+                ),
                 "action": "Investigate top contributing factor.",
             }
         try:

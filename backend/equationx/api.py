@@ -1,31 +1,39 @@
 """FastAPI REST API for EquationX — async, with auth & rate limiting."""
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Dict, Optional
+from typing import Dict
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__
-from .logging_config import setup_logging, get_logger
-from .observability import expose_metrics
+from .logging_config import get_logger, setup_logging
 from .models import (
-    DiscoverRequest, DiscoverResponse, DiscoverStatus,
-    ForecastRequest, ForecastResult,
-    ExplanationRequest, ExplanationResult,
-    SimulateRequest, SimulateResult, HealthResponse,
+    DiscoverRequest,
+    DiscoverResponse,
+    DiscoverStatus,
+    ExplanationRequest,
+    ExplanationResult,
+    ForecastRequest,
+    ForecastResult,
+    HealthResponse,
+    SimulateRequest,
+    SimulateResult,
 )
+from .observability import expose_metrics
 from .orchestrator import (
-    run_discovery_async, get_job_status,
-    run_forecast, run_explanation, run_simulation,
-    list_all_equations, get_equation_by_id,
+    get_equation_by_id,
+    get_job_status,
+    list_all_equations,
+    run_discovery_async,
+    run_explanation,
+    run_forecast,
+    run_simulation,
 )
 
 logger = get_logger(__name__)
@@ -91,7 +99,10 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="EquationX",
-        description="AI Scientist for Infrastructure — discovers mathematical laws governing your systems",
+        description=(
+            "AI Scientist for Infrastructure — discovers "
+            "mathematical laws governing your systems"
+        ),
         version=__version__,
         lifespan=lifespan,
     )
@@ -126,7 +137,11 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------
     # 2. GET /discover/{job_id}/status
     # ------------------------------------------------------------------
-    @app.get("/discover/{job_id}/status", response_model=DiscoverStatus, dependencies=[Depends(verify_api_key)])
+    @app.get(
+        "/discover/{job_id}/status",
+        response_model=DiscoverStatus,
+        dependencies=[Depends(verify_api_key)],
+    )
     async def discover_status(job_id: str):
         try:
             status = get_job_status(job_id)

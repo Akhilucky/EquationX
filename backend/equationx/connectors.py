@@ -1,7 +1,7 @@
 """Data connectors for real-time observability platforms."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Callable
+from typing import List
 
 import numpy as np
 import pandas as pd

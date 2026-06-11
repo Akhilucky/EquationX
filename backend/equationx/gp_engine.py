@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
-from deap import base, creator, tools, algorithms
+from deap import base, creator
 
-from .grammar import ASTNode, BINARY_OPS, UNARY_OPS, Grammar, complexity
+from .grammar import ASTNode, Grammar, complexity
 
 try:
     from scipy.optimize import minimize

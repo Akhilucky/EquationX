@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d
 
-from .grammar import ASTNode, BINARY_OPS, UNARY_OPS
+from .grammar import ASTNode
 
+if TYPE_CHECKING:
+    from .models import ForecastPoint
 
 # ---------------------------------------------------------------------------
 # ODE Evaluation
@@ -116,7 +117,7 @@ def forecast(
     horizon_minutes: int = 15,
     time_step_minutes: float = 1.0,
     noise_std: float = 0.05,
-) -> List[ForecastPoint]:
+) -> List["ForecastPoint"]:
     """Generate forecast with confidence intervals.
 
     Uses Monte Carlo perturbation for CI estimation.

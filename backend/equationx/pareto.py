@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple
 
-from .grammar import ASTNode, complexity
+from .grammar import ASTNode
 
 
 @dataclass
